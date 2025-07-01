@@ -7,20 +7,6 @@ export default {
         sans: ["Inter", "system-ui", "sans-serif"],
         jp: ["Noto Sans JP", "Hiragino Sans", "Yu Gothic", "sans-serif"],
       },
-      colors: {
-        primary: {
-          50: "#fff0f0",
-          100: "#ffdddd",
-          200: "#ffc0c0",
-          300: "#ff9494",
-          400: "#ff5757",
-          500: "#ff2323",
-          600: "#ed0707",
-          700: "#c80606",
-          800: "#a50a0a",
-          900: "#881010",
-        },
-      },
     },
   },
   plugins: [
