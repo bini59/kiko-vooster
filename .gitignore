@@ -77,3 +77,6 @@ coverage/
 *.tar.gz
 .npmrc
 .yarn/install-state.gz 
+
+# python venv
+/backend/venv/

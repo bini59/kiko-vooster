@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # Frontend 개발 서버
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - PUBLIC_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: yarn dev --host 0.0.0.0
+    networks:
+      - kiko-dev-network
+
+  # Backend 개발 서버
+  backend-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+      - JWT_SECRET_KEY=development-secret-key-not-for-production
+    volumes:
+      - ./backend:/app
+      - /app/venv
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - .env.development
+    networks:
+      - kiko-dev-network
+
+  # 개발용 PostgreSQL
+  postgres-dev:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=kiko_dev
+      - POSTGRES_USER=kiko_user
+      - POSTGRES_PASSWORD=kiko_password
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/seeds:/docker-entrypoint-initdb.d
+    networks:
+      - kiko-dev-network
+
+  # 개발용 Redis
+  redis-dev:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - kiko-dev-network
+
+  # Adminer (DB 관리 도구)
+  adminer:
+    image: adminer:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres-dev
+    depends_on:
+      - postgres-dev
+    networks:
+      - kiko-dev-network
+    profiles:
+      - tools
+
+  # Redis Insight (Redis 관리 도구)
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    ports:
+      - "8001:8001"
+    volumes:
+      - redis_insight_data:/db
+    networks:
+      - kiko-dev-network
+    profiles:
+      - tools
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  redis_insight_data:
+    driver: local
+
+networks:
+  kiko-dev-network:
+    driver: bridge 
