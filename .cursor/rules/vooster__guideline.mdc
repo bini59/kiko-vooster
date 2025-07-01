@@ -1,0 +1,320 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Project Code Guideline
+
+---
+
+## 1. Project Overview
+
+This project is a web-based Japanese language learning platform integrating radio/podcast audio, synchronized scripts, and vocabulary tools. The tech stack is:
+
+- **Frontend**: SvelteKit 1.x (TypeScript), TailwindCSS, DaisyUI
+- **Backend**: FastAPI (Python 3.11, async), WebSocket, Pydantic v2
+- **Database/Auth**: Supabase (PostgreSQL 15, Row-Level Security)
+- **Infra**: Vercel (FE), Fly.io (BE), Cloudflare CDN (HLS audio)
+- **Architecture**:
+  - Domain-driven, modular boundaries (`auth`, `content`, `learning`, `userStats`)
+  - Clear separation: presentation → application(service) → domain(model) → infrastructure
+  - REST for CRUD, WebSocket for real-time sync
+
+---
+
+## 2. Core Principles
+
+1. **Explicitness**: All code MUST be self-explanatory and avoid magic values or side effects.
+2. **Single Responsibility**: Each module, function, or component MUST serve one clear purpose.
+3. **Type Safety**: All TypeScript and Python code MUST use strict typing.
+4. **Accessibility First**: UI MUST comply with WCAG 2.1 AA and be keyboard navigable.
+5. **Fail Fast & Safe**: Errors MUST be handled explicitly and surfaced early.
+
+---
+
+## 3. Language-Specific Guidelines
+
+### 3.1 SvelteKit (TypeScript)
+
+#### File Organization
+
+- MUST follow `/src/lib/<domain>/<type>/` for components, stores, hooks, and utils.
+- Each route logic MUST reside in `/src/routes/<feature>/+page.svelte` or `+page.ts`.
+- Shared UI and logic MUST be placed under `/src/lib/`.
+
+```typescript
+// MUST: Domain-driven file structure
+/src/lib/learning/components/Flashcard.svelte
+/src/lib/learning/stores/progress.ts
+/src/lib/learning/hooks/useRepeat.ts
+```
+
+#### Import/Dependency Management
+
+- MUST use absolute imports from `src/lib` for internal modules.
+- MUST import only required functions/components, NEVER import `*` unless importing types.
+- External dependencies MUST be listed in `package.json` and kept minimal.
+
+```typescript
+// MUST: Explicit, minimal import
+import { Flashcard } from '$lib/learning/components/Flashcard.svelte';
+```
+
+#### Error Handling
+
+- MUST handle async errors in UI logic and display user-friendly messages.
+- MUST use try/catch in async stores or load functions.
+- Errors from API calls MUST be surfaced via SvelteKit's `error` or custom error boundaries.
+
+```typescript
+// MUST: Handle async error in load function
+export const load = async ({ fetch }) => {
+  try {
+    const res = await fetch('/api/v1/words');
+    if (!res.ok) throw new Error('Failed to load words');
+    return { words: await res.json() };
+  } catch (err) {
+    throw error(500, 'Vocabulary fetch failed');
+  }
+};
+```
+
+---
+
+### 3.2 FastAPI (Python 3.11)
+
+#### File Organization
+
+- MUST follow `/app/<layer>/<domain>.py` (e.g., `/app/api/v1/words.py`).
+- Each API resource MUST have its own module.
+- Business logic MUST be in `/services/`, models in `/models/`, and shared utils in `/utils/`.
+
+```python
+# MUST: API resource module
+/app/api/v1/scripts.py
+/app/services/sentence_sync.py
+/app/models/word.py
+```
+
+#### Import/Dependency Management
+
+- MUST use explicit relative imports within the app.
+- MUST NOT import unused modules.
+- External dependencies MUST be declared in `pyproject.toml` and kept up-to-date.
+
+```python
+# MUST: Explicit import
+from app.services.sentence_sync import align_sentences
+```
+
+#### Error Handling
+
+- MUST use FastAPI exception handlers for API errors.
+- All endpoints MUST validate input/output via Pydantic schemas.
+- Errors in async tasks MUST be logged and reported (e.g., Sentry).
+
+```python
+# MUST: Pydantic validation and error response
+from fastapi import HTTPException
+
+@app.post("/api/v1/words")
+async def add_word(word: WordCreate):
+    if not valid_japanese(word.text):
+        raise HTTPException(status_code=400, detail="Invalid word")
+    ...
+```
+
+---
+
+## 4. Code Style Rules
+
+### 4.1 MUST Follow
+
+#### Frontend
+
+- **Use TypeScript everywhere** for type safety and maintainability.
+- **Component Naming**: MUST use PascalCase for Svelte components.
+- **TailwindCSS**: MUST use utility classes; avoid custom CSS unless necessary.
+- **Accessibility**: All interactive elements MUST have accessible labels and keyboard focus.
+
+```svelte
+<!-- MUST: Accessible button with Tailwind -->
+<button
+  class="btn btn-primary"
+  aria-label="Play Sentence"
+  on:click={playSentence}
+>
+  ▶️
+</button>
+```
+
+- **State Management**: MUST use Svelte stores for global state. Each store MUST be domain-scoped and minimal.
+
+```typescript
+// MUST: Minimal, domain-scoped store
+import { writable } from 'svelte/store';
+
+export const currentSentence = writable<number | null>(null);
+```
+
+#### Backend
+
+- **Async/Await**: All I/O MUST be async; blocking code is prohibited.
+- **Pydantic Models**: All request/response MUST use Pydantic v2 models.
+- **API Versioning**: All endpoints MUST be under `/api/v1/`.
+- **Logging**: MUST log errors with structured JSON (for Loki/Grafana compatibility).
+
+```python
+# MUST: Async endpoint with Pydantic
+from fastapi import APIRouter
+from app.models.word import WordCreate, WordOut
+
+router = APIRouter()
+
+@router.post("/words", response_model=WordOut)
+async def create_word(word: WordCreate):
+    ...
+```
+
+### 4.2 MUST NOT Do
+
+- **Monolithic Files**: MUST NOT combine multiple domains or responsibilities in a single file.
+- **Complex State**: MUST NOT use complex, nested stores or global variables for state management.
+- **Implicit Imports**: MUST NOT use wildcard imports (`import *`) except for TypeScript types.
+- **Uncaught Errors**: MUST NOT leave async errors unhandled.
+
+```typescript
+// MUST NOT: Multiple responsibilities in one file
+// BAD: Player logic, UI, and API calls all mixed
+```
+
+```python
+# MUST NOT: Synchronous DB call in async context
+def get_words():
+    return db.query("SELECT * FROM words")
+# Use async def and await instead.
+```
+
+---
+
+## 5. Architecture Patterns
+
+### 5.1 Component/Module Structure
+
+- **Frontend**: Each feature (e.g., Player, Vocabulary, Review) MUST be a folder with components, stores, and hooks.
+- **Backend**: Each API resource under `/api/v1/`, with service logic separated into `/services/`.
+
+```plaintext
+/src/lib/player/components/PlayerControls.svelte
+/app/api/v1/player.py
+/app/services/player_sync.py
+```
+
+### 5.2 Data Flow Patterns
+
+- **REST**: Use for CRUD and initial data fetches.
+- **WebSocket**: Use for real-time sync (e.g., sentence highlighting, player progress).
+- **Optimistic UI**: On user action, update UI immediately, then confirm via WebSocket ack or API response.
+
+```typescript
+// MUST: Optimistic UI update
+bookmark.set(true); // Assume success
+api.bookmarkWord(wordId).catch(() => bookmark.set(false)); // Revert if error
+```
+
+### 5.3 State Management
+
+- **Svelte Stores**: MUST be minimal, per-domain, and avoid deep nesting.
+- **Derived Stores**: Use for computed state; avoid direct mutation.
+- **No Redux/MobX**: Only Svelte's built-in stores or lightweight custom stores.
+
+```typescript
+// MUST: Derived store for progress
+import { derived } from 'svelte/store';
+export const progressPercent = derived(
+  [currentSentence, totalSentences],
+  ([$current, $total]) => $total ? ($current / $total) * 100 : 0
+);
+```
+
+### 5.4 API Design Standards
+
+- **Versioning**: All endpoints under `/api/v1/`.
+- **Schema Validation**: All payloads MUST be validated with Pydantic.
+- **Consistent Error Format**: All errors MUST return `{ "detail": str, "code": str }`.
+- **Auth**: All protected endpoints MUST require JWT (OAuth2).
+
+```python
+# MUST: Consistent error response
+raise HTTPException(status_code=403, detail="Permission denied", headers={"X-Error-Code": "PERMISSION_DENIED"})
+```
+
+---
+
+## Example Code Snippets
+
+```typescript
+// MUST: Single-responsibility Svelte component
+<script lang="ts">
+  export let sentence: string;
+  export let isActive: boolean;
+</script>
+
+<p class:highlight={isActive}>{sentence}</p>
+
+<style>
+  .highlight { background: yellow; }
+</style>
+// Explanation: This component only renders a sentence with highlight logic, no unrelated logic.
+```
+
+```typescript
+// MUST NOT: Mixing unrelated logic in one component
+<script lang="ts">
+  // BAD: Fetching, state, and UI all mixed
+  let sentence = '';
+  fetch('/api/v1/sentence').then(...);
+  // Also handles player state, vocabulary, etc.
+</script>
+// Explanation: Break into separate components and stores.
+```
+
+```python
+# MUST: Async FastAPI endpoint with Pydantic validation
+from fastapi import APIRouter, HTTPException
+from app.models.user import UserCreate, UserOut
+
+router = APIRouter()
+
+@router.post("/users", response_model=UserOut)
+async def create_user(user: UserCreate):
+    try:
+        user_obj = await create_user_in_db(user)
+        return user_obj
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="User creation failed")
+// Explanation: Uses async, Pydantic, and explicit error handling.
+```
+
+```python
+# MUST NOT: No validation, sync code in async context
+@app.post("/users")
+def create_user(user):
+    user_obj = create_user_in_db(user)  # Not async
+    return user_obj
+// Explanation: Violates async, validation, and error handling requirements.
+```
+
+---
+
+## Quality Criteria
+
+- **Specificity**: All rules are strict and tailored to the SvelteKit + FastAPI + Supabase stack.
+- **Justification**: Each rule enforces maintainability, scalability, and accessibility per PRD/TRD.
+- **Practicality**: Patterns are minimal, modular, and directly implementable by all team members.
+- **Consistency**: All code MUST pass lint, type-check, and CI before merge.
+- **Review**: Every PR MUST be reviewed for adherence to this guideline and rejected if non-compliant.
+
+---
+
+**This document is the definitive coding standard for this project. All contributors are required to follow these guidelines without exception.**

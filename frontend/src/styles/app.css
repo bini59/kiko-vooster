@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 일본어 폰트 최적화 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap');
+
+/* 기본 스타일 */
+html {
+  font-family: 'Inter', system-ui, sans-serif;
+  scroll-behavior: smooth;
+}
+
+/* 일본어 텍스트 스타일링 */
+.text-jp {
+  font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  line-height: 1.8;
+  letter-spacing: 0.025em;
+}
+
+/* 커스텀 컴포넌트 스타일 */
+@layer components {
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-600 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+  
+  .audio-player {
+    @apply bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm;
+  }
+  
+  .script-highlight {
+    @apply bg-yellow-200 dark:bg-yellow-800 transition-colors duration-300;
+  }
+  
+  .word-clickable {
+    @apply cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 rounded px-1 transition-colors duration-200;
+  }
+}
+
+/* 접근성 개선 */
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  
+  .focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+}
+
+/* 다크 모드 스타일 */
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* 반응형 텍스트 크기 */
+.text-responsive {
+  font-size: clamp(0.875rem, 2.5vw, 1.125rem);
+}
+
+/* 일본어 학습 관련 스타일 */
+.furigana {
+  position: relative;
+  display: inline-block;
+}
+
+.furigana::after {
+  content: attr(data-reading);
+  position: absolute;
+  top: -1.2em;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7em;
+  color: #666;
+  white-space: nowrap;
+}
+
+/* 플레이어 진행률 바 */
+.progress-bar {
+  @apply w-full h-2 bg-gray-200 rounded-full overflow-hidden cursor-pointer;
+}
+
+.progress-fill {
+  @apply h-full bg-primary transition-all duration-300 ease-out;
+}
+
+/* 모바일 최적화 */
+@media (max-width: 768px) {
+  .container {
+    @apply px-4;
+  }
+  
+  .text-jp {
+    line-height: 1.9;
+  }
+} 
