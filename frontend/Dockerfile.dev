@@ -1,0 +1,23 @@
+# Development Dockerfile for SvelteKit frontend
+FROM node:18-alpine
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 패키지 매니저 설정 (yarn 1.x 고정)
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate
+
+# 의존성 파일 복사
+COPY package.json yarn.lock* ./
+
+# 의존성 설치
+RUN yarn install --frozen-lockfile --network-timeout 300000
+
+# 소스 코드 복사 (개발환경에서는 볼륨 마운트로 대체)
+COPY . .
+
+# 포트 노출
+EXPOSE 5173
+
+# 개발 서버 실행 (hot reload)
+CMD ["yarn", "dev", "--host", "0.0.0.0", "--port", "5173"] 

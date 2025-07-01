@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 100 * 1024 * 1024  # 100MB
     ALLOWED_FILE_TYPES: List[str] = [".mp3", ".wav", ".m4a", ".aac"]
     
+    # Supabase Storage 설정
+    STORAGE_BUCKET: str = "audio-files"
+    STORAGE_SIGNED_URL_EXPIRES: int = 14400  # 4시간
+    
     @validator("CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v):
         """CORS origins 검증 및 변환"""

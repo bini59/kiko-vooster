@@ -1,0 +1,186 @@
+# Technical Requirements Document (TRD)
+
+## 1. Executive Technical Summary
+- **프로젝트 개요**  
+  일본어 라디오·팟캐스트 오디오와 스크립트를 실시간 싱크하여 청취·발화·어휘 학습을 통합 제공하는 웹 서비스. 모바일·데스크톱 브라우저에서 동일 경험을 보장하며, 개인 단어장·복습 모드·UGC 스크립트 공유 기능을 포함한다.
+- **코어 기술 스택**  
+  - Frontend: SvelteKit (v1.x) + TypeScript + TailwindCSS + DaisyUI  
+  - Backend: Python 3.11 + FastAPI (v0.110) + Uvicorn + WebSocket  
+  - DB/Auth/Storage: Supabase (PostgreSQL 15, Row-Level Security, Storage, Realtime)  
+  - 인프라: Vercel(프론트), Fly.io(Backend API), Cloudflare CDN(HLS 오디오)  
+  - 오디오 파이프라인: FFmpeg, HLS, Supabase Storage → Cloudflare  
+- **핵심 기술 목표**  
+  - TTI ≤ 2.5 s, p95 API ≤ 300 ms, 오디오 버퍼링 < 500 ms  
+  - 동시 접속 50 K 지원, 99.8 % Crash-Free, 99.95 % 가용성  
+  - WCAG 2.1 AA, 키보드 탐색 100 %  
+- **주요 기술 가정**  
+  1. 저작권은 CC 또는 제휴된 라디오 스트림만 사용  
+  2. 초기 콘텐츠 10 GB, 월간 트래픽 5 TB로 시작  
+  3. 실시간 싱크 정확도 ±200 ms 허용  
+  4. 팀 구성: FE 2, BE 2, DevOps 1, QA 1
+
+## 2. Technology Stack Architecture
+### Frontend Technology Stack
+| 카테고리 | 선택 기술 | 세부 내용 |
+|---|---|---|
+| Core Framework | SvelteKit 1.x | 동적 라우팅 + SSR/SPA 하이브리드 |
+| State Management | Svelte store + zustand style 커스텀 스토어 | 글로벌 학습 상태·플레이어 제어 |
+| Routing & Navigation | SvelteKit 내장 라우터 | 파일 기반, lazy load |
+| UI/UX Framework | DaisyUI + TailwindCSS | 다크모드·접근성 토큰 내장 |
+| Build Tools | Vite 4, pnpm, eslint, prettier, Playwright e2e | CI 병렬 테스트 지원 |
+
+### Backend Technology Stack
+| 카테고리 | 선택 기술 | 세부 내용 |
+|---|---|---|
+| Runtime | Python 3.11 (CPython) | async/await 기반 I/O |
+| Web Framework | FastAPI 0.110 + Uvicorn | ASGI, pydantic v2 |
+| API Design | RESTful v1 / WebSocket(channel: `/ws/player`) | Swagger 자동 문서화 |
+| Data Validation | Pydantic & RLS | 입력·출력 스키마 통합 |
+| Middleware | CORS, OAuth2(JWT), Prometheus, Sentry | 공통 로깅·트레이싱 |
+
+### Database & Persistence Layer
+| 항목 | 내용 |
+|---|---|
+| Primary DB | Supabase PostgreSQL 15 (Tokyo region) |
+| Schema Design | 3NF 기반, 주요 테이블: `users`, `scripts`, `sentences`, `words`, `bookmarks`, `progress` |
+| Caching | Cloudflare CDN(HLS·정적), Redis (Fly.io 내부) – 플레이어 메타데이터 5 min TTL |
+| Migration | Supabase Migrations + Alembic 버전 태깅 |
+| Backup & Recovery | 일일 Wal-G 스냅샷, 30일 보존, RPO 5 min |
+
+### Infrastructure & DevOps
+| 항목 | 내용 |
+|---|---|
+| Hosting | Vercel FE(Edge Functions 미사용), Fly.io BE(2 × shared-cpu-1x) |
+| Containerization | Docker multi-stage, Fly.io deploy toml |
+| CI/CD | GitHub Actions: lint→test→build→deploy, PR 세분화 |
+| Monitoring | Prometheus + Grafana(Fly.io), Vercel Analytics, Sentry (FE/BE) |
+| Logging | Loki + Grafana Cloud; 구조적 JSON 로그 |
+
+## 3. System Architecture Design
+### Top-Level Building Blocks
+- **Frontend Web App**  
+  - SvelteKit SPA/SSR, Audio Player, Script Sync UI, Vocabulary UI  
+- **Backend API**  
+  - REST / WebSocket, Auth, Sentence Sync Service, Word Lookup Proxy  
+- **Database Layer**  
+  - Supabase Postgres + RLS, Edge Caching, Realtime Channels  
+- **Media Pipeline**  
+  - FFmpeg Transcoder, HLS Segmenter, Cloudflare CDN distribution  
+- **DevOps & Observability**  
+  - CI/CD pipelines, Monitoring, Alertmanager, Central Log Store  
+
+### Top-Level Component Interaction Diagram
+```mermaid
+graph TD
+    A[SvelteKit Frontend] -- HTTPS --> B[FastAPI Backend]
+    B -- Supabase Client --> C[Supabase DB & Storage]
+    B -- WebSocket --> A
+    C -- Realtime Channels --> A
+    B -- HLS URL Signed --> D[Cloudflare CDN]
+    D -- .m3u8/.ts --> A
+```
+- 브라우저는 FastAPI REST로 초기 데이터, 이후 WebSocket으로 실시간 상태 수신  
+- FastAPI는 Supabase Postgres에 Row-Level Security 기반 쿼리 수행  
+- 오디오 파일은 HLS URL 서명 후 Cloudflare CDN에서 스트리밍  
+- Supabase Realtime은 UGC 스크립트 편집 변경 사항을 프런트에 푸시
+
+### Code Organization & Convention
+**Domain-Driven Organization Strategy**
+- 도메인: `auth`, `content`, `learning`, `userStats` 등 경계 정의  
+- 레이어: presentation → application(service) → domain(model) → infrastructure  
+- 기능 단위 모듈: SentenceSync, Vocabulary, Player, Review  
+- 공유 모듈: 공통 UI, hooks, DTO, error handler
+
+**Universal File & Folder Structure**
+```
+/project-root
+├── frontend/
+│   ├── src/
+│   │   ├── lib/
+│   │   │   ├── components/
+│   │   │   ├── stores/
+│   │   │   ├── hooks/
+│   │   │   └── utils/
+│   │   ├── routes/
+│   │   │   ├── +layout.svelte
+│   │   │   └── (auth|player|vocab)/+page.svelte
+│   │   └── styles/
+│   ├── static/
+│   └── package.json
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── v1/
+│   │   │   │   ├── auth.py
+│   │   │   │   ├── scripts.py
+│   │   │   │   └── words.py
+│   │   ├── services/
+│   │   ├── models/
+│   │   ├── websocket/
+│   │   ├── core/
+│   │   └── utils/
+│   ├── Dockerfile
+│   └── pyproject.toml
+├── database/
+│   ├── migrations/
+│   ├── seeds/
+│   └── schema.sql
+└── infrastructure/
+    ├── fly/
+    ├── vercel/
+    ├── scripts/
+    └── monitoring/
+```
+
+### Data Flow & Communication Patterns
+- **Client-Server**: REST (등록/조회) + WebSocket (문장 진행 이벤트)  
+- **DB Interaction**: Supabase JS client(프론트) / async-pg(백엔드) → RLS  
+- **외부 서비스**: JMdict 사전 API 프록시 캐시 24 h, OAuth(Google·Apple)  
+- **Real-time**: `player_progress` 채널(WebSocket) → 다중 기기 동기화  
+- **데이터 동기화**: Optimistic UI 업데이트 후 WebSocket ack 수신
+
+## 4. Performance & Optimization Strategy
+- Cloudflare CDN 기반 HLS edge 캐싱, 첫 세그먼트 프리로딩으로 버퍼링 최소화  
+- SvelteKit SSR → critical CSS inlined, 나머지 lazy component 분할  
+- p95 쿼리 분석 & Supabase 인덱스 튜닝 (`sentences(script_id, ts)`)  
+- FastAPI Uvicorn workers Auto-scale(Fly.io) → CPU/IO 부하 분리
+
+## 5. Implementation Roadmap & Milestones
+### Phase 1: Foundation (MVP) – 6 주
+- 인프라: Vercel·Fly.io 셋업, Supabase 초기 스키마  
+- 필수 기능: 재생·일시정지, 스크립트 싱크, 소셜 로그인, 프로필  
+- 보안: HTTPS, OAuth2, RLS 기본 정책  
+- CI/CD: GitHub Actions lint/test/deploy 파이프라인  
+- 완료 목표: 2024-07-31
+
+### Phase 2: Feature Enhancement – 4 주
+- 단어장 CRUD, 복습(플래시카드) 모드, 학습 통계 대시보드  
+- 퍼포먼스: 이미지·오디오 lazy load, DB 인덱스 추가  
+- 보안 확장: 2FA 옵션, Sentry alert  
+- 모니터링: Prometheus alerts 80 % 커버리지  
+- 완료 목표: 2024-09-01 (베타 런치)
+
+### Phase 3: Scaling & Optimization – 3 주
+- Auto-scaling(Fly.io Machines), Redis 캐시 도입, 멀티 테넌시  
+- 고급 통합: 학습 리마인더 이메일, 커뮤니티 리뷰, 추천 알고리즘  
+- 엔터프라이즈: Supabase PITR, 감사 로그, GDPR 데이터 삭제 API  
+- 완료 목표: 2024-10-15 (GA 준비)
+
+## 6. Risk Assessment & Mitigation Strategies
+### Technical Risk Analysis
+| 위험 | 설명 | 대응 |
+|---|---|---|
+| 오디오 저작권 | 라디오 스트림 사용 제한 | 제휴 계약·CC 콘텐츠 한정, 자동 차단 필터 |
+| 싱크 정확도 | AI 자동 매핑 오차 | 수동 편집기 + 사용자 기여 보상 |
+| 성능 병목 | HLS 첫 세그먼트 지연 | 프리패치, CDN edge worker |
+| WebSocket 스케일 | 50 K 동접 시 세션 폭주 | Redis pub/sub + shard-id 확장 |
+
+### Project Delivery Risks
+| 위험 | 설명 | 대응·비상계획 |
+|---|---|---|
+| 일정 지연 | Phase 1 핵심 기능 복잡성 | 모듈화·병렬 개발, 스코프 컷 |
+| 인력 부족 | FE/BE 동시 병목 | 외부 컨트랙터 확보, 우선순위 재조정 |
+| 품질 저하 | 테스트 커버리지 부족 | 필수 e2e 30 %, 코드 리뷰 게이트 |
+| 배포 실패 | 무중단 배포 미숙 | Staging =Prod 파라미터, 블루-그린 롤백 |
+
+---

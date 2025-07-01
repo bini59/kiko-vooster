@@ -24,9 +24,11 @@ coverage.xml
 # 환경 변수 파일
 .env
 .env.local
+.env.development
+.env.production
 .env.development.local
-.env.test.local
 .env.production.local
+.env.test.local
 
 # IDE 및 에디터
 .vscode/
