@@ -147,6 +147,8 @@ async def read_root():
 @app.get("/health")
 async def health_check():
     """헬스 체크 엔드포인트"""
+    from datetime import datetime, timezone
+    
     try:
         # 데이터베이스 연결 상태 확인
         db = await get_database()
@@ -157,7 +159,7 @@ async def health_check():
             "environment": settings.ENVIRONMENT,
             "version": settings.VERSION,
             "database": db_status,
-            "timestamp": "2024-01-01T00:00:00Z"  # 실제로는 현재 시간
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         logger.error(f"헬스 체크 실패: {str(e)}")
@@ -167,7 +169,7 @@ async def health_check():
                 "status": "unhealthy",
                 "error": str(e),
                 "environment": settings.ENVIRONMENT,
-                "timestamp": "2024-01-01T00:00:00Z"
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
 
@@ -175,6 +177,8 @@ async def health_check():
 @app.get("/api/v1/db/status")
 async def database_status():
     """데이터베이스 상태 확인"""
+    from datetime import datetime, timezone
+    
     try:
         db = await get_database()
         
@@ -185,7 +189,8 @@ async def database_status():
             return {
                 "status": "connected",
                 "tables_accessible": True,
-                "message": "데이터베이스 정상 작동"
+                "message": "데이터베이스 정상 작동",
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
         else:
             return JSONResponse(
@@ -193,7 +198,8 @@ async def database_status():
                 content={
                     "status": "disconnected",
                     "tables_accessible": False,
-                    "message": "데이터베이스 연결 실패"
+                    "message": "데이터베이스 연결 실패",
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 }
             )
     except Exception as e:
@@ -203,9 +209,25 @@ async def database_status():
             content={
                 "status": "error",
                 "error": str(e),
-                "message": "데이터베이스 상태 확인 중 오류 발생"
+                "message": "데이터베이스 상태 확인 중 오류 발생",
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
         )
+
+# 애플리케이션 생명주기 이벤트
+@app.on_event("startup")
+async def startup_event():
+    """애플리케이션 시작 시 실행되는 이벤트"""
+    logger.info(f"🚀 Kiko Vooster API 시작 - 환경: {settings.ENVIRONMENT}")
+    logger.info(f"📊 디버그 모드: {settings.DEBUG}")
+    logger.info(f"🔧 API 문서: {settings.ENABLE_API_DOCS}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """애플리케이션 종료 시 실행되는 이벤트"""
+    logger.info("🔄 애플리케이션 종료 중...")
+    await cleanup_dependencies()
+    logger.info("✅ 애플리케이션 종료 완료")
 
 # 전역 예외 처리
 @app.exception_handler(Exception)

@@ -14,6 +14,7 @@ import { audioApi } from "$lib/api/audio.js";
 import { syncApi } from "$lib/api/sync.js";
 import { websocketService } from "./websocketService.js";
 import { audioService } from "./audioService.js";
+import { logger, logError } from "$lib/utils/logger";
 
 // Stores
 import {
@@ -79,12 +80,12 @@ class PlayerIntegrationService {
       this.integrationState.isInitialized = true;
       this.integrationState.isLoading = false;
 
-      console.log("Player integration service initialized");
+      logger.info("Player integration service initialized");
     } catch (error) {
       this.integrationState.lastError =
         error instanceof Error ? error.message : "Initialization failed";
       this.integrationState.isLoading = false;
-      console.error("Failed to initialize player integration service:", error);
+      logError(error, "Failed to initialize player integration service");
       throw error;
     }
   }

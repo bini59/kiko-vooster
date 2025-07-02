@@ -8,6 +8,7 @@
 import { browser } from "$app/environment";
 import { get, writable, type Writable } from "svelte/store";
 import type { WebSocketMessage } from "$lib/types/sync.js";
+import { logger, logError } from "$lib/utils/logger";
 
 // WebSocket 연결 상태
 export const wsConnectionState = writable<{
@@ -83,7 +84,7 @@ class WebSocketService {
    */
   async connect(scriptId: string, authToken?: string): Promise<void> {
     if (!browser) {
-      console.warn("WebSocket connection attempted on server side");
+      logger.warn("WebSocket connection attempted on server side");
       return;
     }
 
@@ -92,7 +93,7 @@ class WebSocketService {
       this.ws.readyState === WebSocket.OPEN &&
       this.currentScriptId === scriptId
     ) {
-      console.log("Already connected to the same script");
+      logger.info("Already connected to the same script");
       return;
     }
 
@@ -165,7 +166,7 @@ class WebSocketService {
    * 연결 성공 처리
    */
   private handleOpen(): void {
-    console.log("WebSocket connected");
+    logger.info("WebSocket connected");
 
     wsConnectionState.update((state) => ({
       ...state,
@@ -192,7 +193,7 @@ class WebSocketService {
     try {
       const message: WebSocketMessage = JSON.parse(event.data);
 
-      console.debug("WebSocket message received:", message);
+      logger.debug("WebSocket message received:", message);
 
       switch (message.type) {
         case "CONNECTION_ACK":
@@ -214,10 +215,10 @@ class WebSocketService {
           this.handlePong(message.data);
           break;
         default:
-          console.warn("Unknown WebSocket message type:", message.type);
+          logger.warn("Unknown WebSocket message type:", message.type);
       }
     } catch (error) {
-      console.error("Failed to parse WebSocket message:", error);
+      logError(error, "Failed to parse WebSocket message");
     }
   }
 
@@ -230,7 +231,7 @@ class WebSocketService {
 
     this.emitEvent("connection_ack", data);
 
-    console.log(
+    logger.info(
       `Connected to room ${this.roomId} with connection ID ${this.connectionId}`
     );
   }
@@ -246,14 +247,14 @@ class WebSocketService {
 
     this.emitEvent("pong", data);
 
-    console.debug("Pong received");
+    logger.debug("Pong received");
   }
 
   /**
    * 연결 종료 처리
    */
   private handleClose(event: CloseEvent): void {
-    console.log("WebSocket closed:", event.code, event.reason);
+    logger.info("WebSocket closed:", event.code, event.reason);
 
     wsConnectionState.update((state) => ({
       ...state,
@@ -273,7 +274,7 @@ class WebSocketService {
    * 에러 처리
    */
   private handleError(event: Event): void {
-    console.error("WebSocket error:", event);
+          logError(new Error(`WebSocket error: ${event.type}`), "WebSocket error");
 
     this.handleConnectionError(new Error("WebSocket connection error"));
   }
@@ -304,7 +305,7 @@ class WebSocketService {
    */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("Max reconnection attempts reached");
+      logError(new Error("Max reconnection attempts reached"), "Max reconnection attempts reached");
       wsConnectionState.update((state) => ({
         ...state,
         error: "Connection failed after maximum retry attempts",
@@ -317,7 +318,7 @@ class WebSocketService {
       this.maxReconnectDelay
     );
 
-    console.log(
+    logger.info(
       `Scheduling reconnection in ${delay}ms (attempt ${
         this.reconnectAttempts + 1
       })`
@@ -375,7 +376,7 @@ class WebSocketService {
 
     // Pong 타임아웃 설정 (5초)
     this.pongTimeoutId = window.setTimeout(() => {
-      console.warn("Pong timeout - connection may be dead");
+      logger.warn("Pong timeout - connection may be dead");
       this.ws?.close(1002, "Ping timeout");
     }, 5000);
   }
@@ -407,7 +408,7 @@ class WebSocketService {
       try {
         this.ws!.send(JSON.stringify(fullMessage));
       } catch (error) {
-        console.error("Failed to send WebSocket message:", error);
+        logError(error, "Failed to send WebSocket message");
         this.messageQueue.push(fullMessage);
       }
     } else {
@@ -498,9 +499,9 @@ class WebSocketService {
         try {
           listener(data);
         } catch (error) {
-          console.error(
-            `Error in WebSocket event listener for ${eventType}:`,
-            error
+          logError(
+            error,
+            `Error in WebSocket event listener for ${eventType}`
           );
         }
       });

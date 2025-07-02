@@ -18,6 +18,7 @@ import {
 } from "$lib/stores/audioStore";
 import { scriptActions } from "$lib/stores/scriptStore";
 import { get } from "svelte/store";
+import { logger, logError, PerformanceTimer } from "$lib/utils/logger";
 
 export class AudioService {
   private audio: HTMLAudioElement | null = null;
@@ -41,9 +42,9 @@ export class AudioService {
       this.setupStoreSubscriptions();
       this.isInitialized = true;
 
-      console.log("🎵 AudioService initialized successfully");
+      logger.info("🎵 AudioService initialized successfully");
     } catch (error) {
-      console.error("❌ AudioService initialization failed:", error);
+      logError(error, "❌ AudioService initialization failed");
       audioActions.setError("오디오 서비스 초기화에 실패했습니다");
     }
   }
@@ -65,7 +66,7 @@ export class AudioService {
         error: null,
       }));
 
-      console.log("📊 Audio metadata loaded, duration:", this.audio.duration);
+      logger.debug("📊 Audio metadata loaded, duration:", this.audio.duration);
     });
 
     // 오디오 데이터 로딩 시작
@@ -140,7 +141,7 @@ export class AudioService {
         }
       }
 
-      console.error("🚨 Audio error:", error, e);
+      logError(error, "🚨 Audio error");
       audioActions.setError(errorMessage);
     });
 
@@ -281,7 +282,7 @@ export class AudioService {
       this.audio.src = url;
       this.audio.load();
 
-      console.log("🎵 Loading audio:", url);
+      logger.debug("🎵 Loading audio:", url);
 
       // 메타데이터 로드 대기
       return new Promise((resolve, reject) => {
@@ -306,7 +307,7 @@ export class AudioService {
         this.audio.addEventListener("error", onError);
       });
     } catch (error) {
-      console.error("❌ Failed to load audio:", error);
+                logError(error, "❌ Failed to load audio");
       audioActions.setError("오디오 파일을 로드할 수 없습니다");
       throw error;
     }
@@ -327,7 +328,7 @@ export class AudioService {
         this.audio.pause();
       }
     } catch (error) {
-      console.error("❌ Failed to toggle play:", error);
+      logError(error, "❌ Failed to toggle play");
       audioActions.setError("재생 제어에 실패했습니다");
       throw error;
     }
@@ -342,7 +343,7 @@ export class AudioService {
     const targetTime = Math.max(0, Math.min(time, this.audio.duration || 0));
     this.audio.currentTime = targetTime;
 
-    console.log("⏩ Seeking to:", targetTime);
+    logger.debug("⏩ Seeking to:", targetTime);
   }
 
   /**
@@ -373,7 +374,7 @@ export class AudioService {
   setPointA(time?: number): void {
     const currentTime = time ?? this.audio?.currentTime ?? 0;
     abRepeatActions.setPointA(currentTime);
-    console.log("📍 A point set at:", currentTime);
+    logger.debug("📍 A point set at:", currentTime);
   }
 
   /**
@@ -382,7 +383,7 @@ export class AudioService {
   setPointB(time?: number): void {
     const currentTime = time ?? this.audio?.currentTime ?? 0;
     abRepeatActions.setPointB(currentTime);
-    console.log("📍 B point set at:", currentTime);
+    logger.debug("📍 B point set at:", currentTime);
   }
 
   /**
@@ -392,7 +393,7 @@ export class AudioService {
     abRepeatActions.toggleRepeat();
 
     const abState = get(abRepeatState);
-    console.log("🔄 AB repeat:", abState.isActive ? "ON" : "OFF");
+    logger.debug("🔄 AB repeat:", abState.isActive ? "ON" : "OFF");
   }
 
   /**
@@ -400,7 +401,7 @@ export class AudioService {
    */
   clearABPoints(): void {
     abRepeatActions.clearPoints();
-    console.log("🗑️ AB points cleared");
+    logger.debug("🗑️ AB points cleared");
   }
 
   /**
@@ -414,14 +415,14 @@ export class AudioService {
     if (mapping) {
       this.seekTo(mapping.startTime);
       scriptActions.setCurrentSentence(sentenceId);
-      console.log(
+      logger.debug(
         "🎯 Jumped to sentence:",
         sentenceId,
         "at",
         mapping.startTime
       );
     } else {
-      console.warn("⚠️ No mapping found for sentence:", sentenceId);
+      logger.warn("⚠️ No mapping found for sentence:", sentenceId);
     }
   }
 
@@ -440,7 +441,7 @@ export class AudioService {
     }
 
     this.isInitialized = false;
-    console.log("🧹 AudioService destroyed");
+    logger.info("🧹 AudioService destroyed");
   }
 
   /**
