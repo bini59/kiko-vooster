@@ -364,7 +364,12 @@ export const vocabularyActions = {
    */
   async updateWord(wordId: string, updates: { masteryLevel?: number; tags?: string[]; notes?: string }) {
     try {
-      const response = await vocabularyApi.updateWord(wordId, updates);
+      // API 호출 시 백엔드가 기대하는 형식으로 변환
+      const response = await vocabularyApi.updateWord(wordId, {
+        masteryLevel: updates.masteryLevel,
+        tags: updates.tags,
+        notes: updates.notes
+      });
       
       vocabularyState.update(state => ({
         ...state,
@@ -476,7 +481,7 @@ export const reviewActions = {
           type: 'info',
           message: '복습할 단어가 없습니다.'
         });
-        return;
+        return null;
       }
 
       const session: ReviewSession = {
@@ -496,12 +501,15 @@ export const reviewActions = {
         type: 'success',
         message: `${response.words.length}개 단어로 복습을 시작합니다.`
       });
+
+      return session;
     } catch (error) {
       console.error('Failed to start review:', error);
       notificationActions.add({
         type: 'error',
         message: '복습 시작에 실패했습니다.'
       });
+      throw error;
     }
   },
 
@@ -610,4 +618,17 @@ export const reviewActions = {
 // 초기화 함수 (앱 시작 시 호출)
 export async function initializeVocabulary() {
   await vocabularyActions.loadUserWords();
-} 
+}
+
+// 통합 스토어 객체 (기존 코드 호환성을 위해)
+export const vocabularyStore = {
+  ...vocabularyActions,
+  ...reviewActions,
+  state: vocabularyState,
+  reviewSession,
+  reviewSettings,
+  filteredWords,
+  paginatedWords,
+  reviewProgress,
+  initializeVocabulary
+}; 

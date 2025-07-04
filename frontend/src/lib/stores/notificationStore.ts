@@ -81,5 +81,10 @@ export const showWarning = (message: string, options?: Partial<Omit<Notification
 export const showInfo = (message: string, options?: Partial<Omit<Notification, 'id' | 'message' | 'type' | 'timestamp'>>) => 
   showNotification(message, 'info', options);
 
-// Export store
-export { notifications }; 
+// Export store and convenience aliases
+export { notifications };
+
+// Convenience aliases for common actions
+export const removeNotification = notificationActions.remove;
+export const addNotification = notificationActions.add;
+export const clearNotifications = notificationActions.clear; 

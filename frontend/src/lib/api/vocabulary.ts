@@ -42,13 +42,12 @@ export class VocabularyApiService {
     searchType: SearchType = SearchType.ALL,
     limit: number = 20
   ): Promise<WordSearchResponse> {
-    const params = new URLSearchParams({
+    // 백엔드는 POST 방식으로 request body를 받습니다
+    return this.apiClient.post<WordSearchResponse>('/words/search', {
       query,
       search_type: searchType,
-      limit: limit.toString()
+      limit
     });
-
-    return this.apiClient.get<WordSearchResponse>(`/words/search?${params}`);
   }
 
   /**
@@ -100,40 +99,62 @@ export class VocabularyApiService {
     masteryLevels?: number[]
   ): Promise<{ words: UserWord[]; total: number; page: number; totalPages: number }> {
     const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString()
+      limit: limit.toString(),
+      offset: ((page - 1) * limit).toString()
     });
 
     if (tags && tags.length > 0) {
-      params.append('tags', tags.join(','));
+      // 백엔드는 여러 태그를 개별 쿼리 파라미터로 받습니다
+      tags.forEach(tag => params.append('tags', tag));
     }
 
     if (masteryLevels && masteryLevels.length > 0) {
-      params.append('mastery_levels', masteryLevels.join(','));
+      // 백엔드는 단일 mastery_level만 지원하므로 첫 번째 값 사용
+      params.append('mastery_level', masteryLevels[0].toString());
     }
 
-    return this.apiClient.get(`/vocabulary/words?${params}`);
+    // 수정된 경로: /words/vocabulary/list
+    const response = await this.apiClient.get(`/words/vocabulary/list?${params}`);
+    
+    // 백엔드 응답을 프론트엔드 형식에 맞게 변환
+    return {
+      words: response.words,
+      total: response.total,
+      page: page,
+      totalPages: Math.ceil(response.total / limit)
+    };
   }
 
   /**
    * 단어를 사용자 단어장에 추가
    */
   async addWordToVocabulary(request: AddWordRequest): Promise<AddWordResponse> {
-    return this.apiClient.post<AddWordResponse>('/vocabulary/words', request);
+    // 수정된 경로: /words/vocabulary/add
+    return this.apiClient.post<AddWordResponse>('/words/vocabulary/add', {
+      word_text: request.wordText,
+      tags: request.tags,
+      notes: request.notes
+    });
   }
 
   /**
    * 사용자 단어 정보 업데이트
    */
   async updateUserWord(wordId: string, request: UpdateWordRequest): Promise<UpdateWordResponse> {
-    return this.apiClient.put<UpdateWordResponse>(`/vocabulary/words/${wordId}`, request);
+    // 수정된 경로: /words/vocabulary/{wordId}
+    return this.apiClient.put<UpdateWordResponse>(`/words/vocabulary/${wordId}`, {
+      mastery_level: request.masteryLevel,
+      tags: request.tags,
+      notes: request.notes
+    });
   }
 
   /**
    * 단어장에서 단어 제거
    */
   async removeWordFromVocabulary(wordId: string): Promise<{ message: string }> {
-    return this.apiClient.delete(`/vocabulary/words/${wordId}`);
+    // 수정된 경로: /words/vocabulary/{wordId}
+    return this.apiClient.delete(`/words/vocabulary/${wordId}`);
   }
 
   /**
@@ -165,21 +186,23 @@ export class VocabularyApiService {
    * 사용자의 모든 태그 조회
    */
   async getUserTags(): Promise<string[]> {
-    return this.apiClient.get<string[]>('/vocabulary/tags');
+    // 수정된 경로: /words/vocabulary/tags
+    const response = await this.apiClient.get<{ tags: string[] }>('/words/vocabulary/tags');
+    return response.tags;
   }
 
   /**
    * 태그별 단어 수 조회
    */
   async getTagCounts(): Promise<Record<string, number>> {
-    return this.apiClient.get<Record<string, number>>('/vocabulary/tags/counts');
+    return this.apiClient.get<Record<string, number>>('/words/vocabulary/tags/counts');
   }
 
   /**
    * 태그 이름 변경
    */
   async renameTag(oldTag: string, newTag: string): Promise<{ message: string }> {
-    return this.apiClient.put('/vocabulary/tags/rename', {
+    return this.apiClient.put('/words/vocabulary/tags/rename', {
       old_tag: oldTag,
       new_tag: newTag
     });
@@ -189,7 +212,7 @@ export class VocabularyApiService {
    * 태그 삭제 (모든 단어에서 제거)
    */
   async deleteTag(tag: string): Promise<{ message: string }> {
-    return this.apiClient.delete(`/vocabulary/tags/${encodeURIComponent(tag)}`);
+    return this.apiClient.delete(`/words/vocabulary/tags/${encodeURIComponent(tag)}`);
   }
 
   // ===================
@@ -200,7 +223,8 @@ export class VocabularyApiService {
    * 단어장 통계 조회
    */
   async getVocabularyStats(): Promise<VocabularyStatsResponse> {
-    return this.apiClient.get<VocabularyStatsResponse>('/vocabulary/stats');
+    // 수정된 경로: /words/vocabulary/stats
+    return this.apiClient.get<VocabularyStatsResponse>('/words/vocabulary/stats');
   }
 
   /**
@@ -212,7 +236,7 @@ export class VocabularyApiService {
     weeklyAdditions: number[];
     accuracyTrend: number[];
   }> {
-    return this.apiClient.get('/vocabulary/progress');
+    return this.apiClient.get('/words/vocabulary/progress');
   }
 
   // ===================
@@ -223,19 +247,19 @@ export class VocabularyApiService {
    * 복습할 단어 목록 조회
    */
   async getReviewWords(request: ReviewWordsRequest): Promise<ReviewWordsResponse> {
-    const params = new URLSearchParams({
-      count: request.count.toString(),
+    // 백엔드는 POST 방식으로 request body를 받습니다
+    return this.apiClient.post<ReviewWordsResponse>('/words/review/words', {
+      count: request.count,
       mode: request.mode
     });
-
-    return this.apiClient.get<ReviewWordsResponse>(`/vocabulary/review?${params}`);
   }
 
   /**
    * 복습 결과 제출
    */
   async submitReviewResult(result: ReviewResultRequest): Promise<ReviewResultResponse> {
-    return this.apiClient.post<ReviewResultResponse>('/vocabulary/review/result', result);
+    // 수정된 경로: /words/review/submit
+    return this.apiClient.post<ReviewResultResponse>('/words/review/submit', result);
   }
 
   /**
@@ -246,10 +270,7 @@ export class VocabularyApiService {
     words: UserWord[];
     totalDue: number;
   }> {
-    return this.apiClient.post('/vocabulary/review/session', {
-      mode,
-      count
-    });
+    return this.apiClient.post('/words/review/start', { mode, count });
   }
 
   /**
@@ -260,25 +281,25 @@ export class VocabularyApiService {
     correctAnswers: number;
     totalTime: number;
   }): Promise<{ message: string }> {
-    return this.apiClient.post(`/vocabulary/review/session/${sessionId}/end`, results);
+    return this.apiClient.post(`/words/review/sessions/${sessionId}/end`, results);
   }
 
   // ===================
-  // 일괄 작업 API
+  // 벌크 작업 API
   // ===================
 
   /**
-   * 여러 단어 일괄 추가
+   * 여러 단어를 한번에 추가
    */
   async bulkAddWords(requests: AddWordRequest[]): Promise<{
     added: UserWord[];
     failed: { request: AddWordRequest; error: string }[];
   }> {
-    return this.apiClient.post('/vocabulary/words/bulk', { words: requests });
+    return this.apiClient.post('/words/vocabulary/bulk/add', { words: requests });
   }
 
   /**
-   * 여러 단어 일괄 업데이트
+   * 여러 단어를 한번에 업데이트
    */
   async bulkUpdateWords(updates: {
     wordId: string;
@@ -287,18 +308,20 @@ export class VocabularyApiService {
     updated: UserWord[];
     failed: { wordId: string; error: string }[];
   }> {
-    return this.apiClient.put('/vocabulary/words/bulk', { updates });
+    return this.apiClient.put('/words/vocabulary/bulk/update', { updates });
   }
 
   /**
-   * 여러 단어 일괄 삭제
+   * 여러 단어를 한번에 삭제
    */
   async bulkDeleteWords(wordIds: string[]): Promise<{
     deleted: string[];
     failed: { wordId: string; error: string }[];
   }> {
-    return this.apiClient.request('/vocabulary/words/bulk', {
+    // DELETE 요청에서 body 데이터를 보내는 방식 조정
+    return this.apiClient.request('/words/vocabulary/bulk/delete', {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ word_ids: wordIds })
     });
   }
@@ -318,7 +341,7 @@ export class VocabularyApiService {
       version: string;
     };
   }> {
-    return this.apiClient.get('/vocabulary/export');
+    return this.apiClient.get('/words/vocabulary/export');
   }
 
   /**
@@ -332,11 +355,11 @@ export class VocabularyApiService {
     skipped: number;
     failed: { word: any; error: string }[];
   }> {
-    return this.apiClient.post('/vocabulary/import', data);
+    return this.apiClient.post('/words/vocabulary/import', data);
   }
 }
 
-// 싱글톤 인스턴스 생성
+// 싱글톤 인스턴스 관리
 let vocabularyApiService: VocabularyApiService | null = null;
 
 /**
@@ -349,9 +372,6 @@ export function getVocabularyApiService(): VocabularyApiService {
   return vocabularyApiService;
 }
 
-/**
- * VocabularyApiService 인스턴스 설정 (테스트용)
- */
 export function setVocabularyApiService(service: VocabularyApiService): void {
   vocabularyApiService = service;
 }

@@ -76,18 +76,18 @@
     <div class="navbar-end">
       <!-- 모바일 메뉴 (햄버거) -->
       <div class="dropdown dropdown-end lg:hidden">
-        <div tabindex="0" role="button" class="btn btn-ghost">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div tabindex="0" role="button" class="btn btn-ghost" aria-label="메뉴 열기">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </div>
-        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
-          <li><a href="/scripts">스크립트</a></li>
-          <li><a href="/vocabulary">단어장</a></li>
-          <li><a href="/practice">연습</a></li>
+        <ul role="menu" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+          <li><a href="/scripts" role="menuitem">스크립트</a></li>
+          <li><a href="/vocabulary" role="menuitem">단어장</a></li>
+          <li><a href="/practice" role="menuitem">연습</a></li>
           {#if !$isLoggedIn}
             <div class="divider"></div>
-            <li><button type="button" on:click={openLoginModal}>로그인</button></li>
+            <li><button type="button" role="menuitem" on:click={openLoginModal}>로그인</button></li>
           {/if}
         </ul>
       </div>

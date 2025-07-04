@@ -18,6 +18,7 @@ from app.core.cache.cache_manager import CacheManager, RedisCacheBackend, Memory
 from app.core.storage.storage_manager import StorageManager, SupabaseStorageBackend, set_storage_manager
 from app.services.audio.audio_service import AudioService, set_audio_service
 from app.services.sync.sync_mapping_service import SyncMappingService, set_sync_mapping_service
+from app.services.scheduler_service import SchedulerService, set_scheduler_service
 from app.websocket.sync_websocket import websocket_router, SyncWebSocketManager, set_sync_websocket_manager
 
 # 로깅 설정
@@ -99,7 +100,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ WebSocket 매니저 초기화 실패: {str(e)}")
     
+    # 알림 스케줄러 초기화
+    try:
+        scheduler_service = SchedulerService()
+        set_scheduler_service(scheduler_service)
+        await scheduler_service.start()
+        logger.info("✅ 알림 스케줄러 초기화 완료")
+    except Exception as e:
+        logger.error(f"❌ 알림 스케줄러 초기화 실패: {str(e)}")
+    
     yield
+    
+    # 종료 시 스케줄러 정리
+    try:
+        scheduler_service = scheduler_service if 'scheduler_service' in locals() else None
+        if scheduler_service:
+            await scheduler_service.stop()
+            logger.info("✅ 알림 스케줄러 종료 완료")
+    except Exception as e:
+        logger.error(f"❌ 알림 스케줄러 종료 실패: {str(e)}")
     
     # 종료 시
     logger.info("🛑 Kiko API 종료 중...")

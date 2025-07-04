@@ -49,6 +49,13 @@ export enum GameMode {
   SPELLING = "spelling"
 }
 
+// 복습 세션용 모드 (게임 모드와 구분)
+export enum ReviewSessionMode {
+  FLASHCARD = "flashcard",
+  FILL_IN_BLANKS = "fillInBlanks", 
+  SPELLING = "spelling"
+}
+
 // ===================
 // 기본 데이터 모델
 // ===================
@@ -232,12 +239,14 @@ export interface ReviewAnswer {
 }
 
 export interface ReviewSettings {
+  mode: ReviewSessionMode;
   showReading: boolean;
   showExample: boolean;
   autoAdvance: boolean;
   timeLimit?: number; // seconds
   shuffleWords: boolean;
   repeatIncorrect: boolean;
+  showHints: boolean;
 }
 
 export interface ReviewProgress {
@@ -303,17 +312,18 @@ export interface WordClickEvent {
 
 export interface ReviewCompleteEvent {
   session: ReviewSession;
-  results: ReviewResults;
+  results: ReviewResult;
 }
 
-export interface ReviewResults {
+export interface ReviewResult {
   totalWords: number;
   correctAnswers: number;
   incorrectAnswers: number;
   accuracyRate: number;
-  totalTime: number;
   averageResponseTime: number;
-  wordsToReview: UserWord[];
+  totalTime: number; // sessionDuration에서 totalTime으로 변경
+  incorrectWords: string[]; // 틀린 단어들의 ID 배열
+  sessionDate: string; // completedAt에서 sessionDate로 변경
 }
 
 export interface TagSelectEvent {
@@ -381,11 +391,13 @@ export const DEFAULT_VOCABULARY_FILTER: VocabularyFilter = {
 };
 
 export const DEFAULT_REVIEW_SETTINGS: ReviewSettings = {
+  mode: ReviewSessionMode.FLASHCARD,
   showReading: true,
   showExample: true,
   autoAdvance: false,
   shuffleWords: true,
-  repeatIncorrect: true
+  repeatIncorrect: true,
+  showHints: true
 };
 
 export const DEFAULT_VOCABULARY_CONFIG: VocabularyConfig = {

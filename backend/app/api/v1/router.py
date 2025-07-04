@@ -6,7 +6,7 @@ Kiko API v1 메인 라우터
 
 from fastapi import APIRouter
 from app.api.v1.endpoints import auth, scripts, words, users, audio
-from app.api.v1 import sync
+from app.api.v1 import sync, notifications
 
 # 메인 API 라우터 생성
 api_router = APIRouter()
@@ -47,4 +47,11 @@ api_router.include_router(
     sync.router,
     prefix="/sync",
     tags=["sync"]
+)
+
+# 알림 관리 API
+api_router.include_router(
+    notifications.router,
+    prefix="/notifications",
+    tags=["notifications"]
 ) 
